@@ -85,7 +85,7 @@ export type TUserContactFields = Pick<IOrder, 'email' | 'phone'>;
 
 ----------
 
-## 📐 Архитектура приложения
+##  Архитектура приложения
 
 Приложение реализовано по принципу **MVP (Model-View-Presenter)**:
 
@@ -98,7 +98,7 @@ export type TUserContactFields = Pick<IOrder, 'email' | 'phone'>;
 
 ----------
 
-## 🧠 Слой данных (Models)
+##  Слой данных (Models)
 
 ### `CartModel`
 
@@ -136,7 +136,7 @@ export type TUserContactFields = Pick<IOrder, 'email' | 'phone'>;
 
 ----------
 
-## 🧩 Слой отображения (View Components)
+##  Слой отображения (View Components)
 
 ### `Component`
 
@@ -183,7 +183,7 @@ export type TUserContactFields = Pick<IOrder, 'email' | 'phone'>;
 
 ----------
 
-## 🔌 EventEmitter (Presenter Layer)
+##  EventEmitter (Presenter Layer)
 
 Механизм связи между слоями:
 
@@ -212,7 +212,7 @@ interface IEvents {
 
 ----------
 
-## 🌐 Работа с API
+##  Работа с API
 
 ```ts
 export interface IApi {
@@ -232,7 +232,7 @@ export interface IApi {
 
 ----------
 
-## 🧾 Прочие интерфейсы
+##  Прочие интерфейсы
 
 ```ts
 export interface ICardActions {
@@ -247,7 +247,7 @@ export interface ISuccessActions {
 
 ----------
 
-## 📋 Типы валидации
+##  Типы валидации
 
 ```ts
 export interface IFormValidator {
@@ -261,7 +261,7 @@ export interface IFormValidator {
 
 ----------
 
-## 📦 Сценарий работы приложения
+##  Сценарий работы приложения
 
 1.  Пользователь видит каталог (`Card`)
     
