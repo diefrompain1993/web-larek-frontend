@@ -1,78 +1,77 @@
 import { Component } from './base/Component';
 import { ensureElement, createElement } from '../utils/utils';
-import { TSummaryProduct } from '../types/index';
-import { IEvents } from '../services/events';
+import { CartItem, EventBus } from '../types';
 
 export class Basket extends Component<null> {
-  private list: HTMLElement;
-  private totalElement: HTMLElement;
-  private checkoutButton: HTMLButtonElement;
-  private events: IEvents;
+  private listElement: HTMLElement;
+  private totalPriceElement: HTMLElement;
+  private confirmButton: HTMLButtonElement;
+  private events: EventBus;
 
-  constructor(container: HTMLElement, events: IEvents) {
+  constructor(container: HTMLElement, events: EventBus) {
     super(container);
     this.events = events;
 
-    this.list = ensureElement<HTMLElement>('.basket__list', container);
-    this.totalElement = ensureElement<HTMLElement>('.basket__price', container);
-    this.checkoutButton = ensureElement<HTMLButtonElement>('.basket__checkout', container);
+    this.listElement = ensureElement<HTMLElement>('.basket__list', container);
+    this.totalPriceElement = ensureElement<HTMLElement>('.basket__price', container);
+    this.confirmButton = ensureElement<HTMLButtonElement>('.basket__checkout', container);
 
-    this.bindEvents();
+    this.bindUI();
   }
 
-  private bindEvents(): void {
-    this.checkoutButton.addEventListener('click', () => {
+  private bindUI(): void {
+    this.confirmButton.addEventListener('click', () => {
       this.events.emit('basket:checkout');
     });
   }
 
-  public update(items: TSummaryProduct[]): HTMLElement {
-    this.list.innerHTML = '';
+  public update(items: CartItem[]): HTMLElement {
+    this.listElement.innerHTML = '';
     let total = 0;
 
     if (items.length === 0) {
-      this.list.innerHTML = '<p class="basket__empty">Корзина пуста</p>';
+      this.listElement.innerHTML = '<p class="basket__empty">Корзина пуста</p>';
     } else {
-      items.forEach((product: TSummaryProduct, index) => {
-        const item = createElement('li', {
+      items.forEach((item, index) => {
+        const element = createElement('li', {
           className: 'basket__item card card_compact',
         });
 
-        const indexSpan = createElement('span', {
+        const indexLabel = createElement('span', {
           className: 'basket__item-index',
           textContent: String(index + 1),
         });
 
-        const titleSpan = createElement('span', {
+        const title = createElement('span', {
           className: 'card__title',
-          textContent: product.title,
+          textContent: item.title,
         });
 
-        const priceSpan = createElement('span', {
+        const price = createElement('span', {
           className: 'card__price',
-          textContent: `${product.price ?? 0} синапсов`,
+          textContent: `${item.price ?? 0} синапсов`,
         });
 
-        const deleteButton = createElement('button', {
+        const deleteBtn = createElement('button', {
           className: 'basket__item-delete',
           ariaLabel: 'Удалить товар из корзины',
         });
 
-        deleteButton.addEventListener('click', () => {
-          if (product.id) {
-            this.events.emit('basket:remove', { id: product.id });
+        deleteBtn.addEventListener('click', () => {
+          if (item.id) {
+            this.events.emit('basket:remove', { id: item.id });
           }
         });
 
-        item.append(indexSpan, titleSpan, priceSpan, deleteButton);
-        this.list.appendChild(item);
+        element.append(indexLabel, title, price, deleteBtn);
+        this.listElement.appendChild(element);
 
-        total += product.price ?? 0;
+        total += item.price ?? 0;
       });
     }
 
-    this.totalElement.textContent = `${total} синапсов`;
-    this.setDisabled(this.checkoutButton, total === 0);
+    this.totalPriceElement.textContent = `${total} синапсов`;
+    this.setDisabled(this.confirmButton, total === 0);
 
     return this.container;
   }

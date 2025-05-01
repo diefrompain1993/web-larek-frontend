@@ -1,4 +1,4 @@
-// Типы событий
+
 type EventName = string | RegExp;
 type Subscriber = Function;
 type EmitterEvent = {
@@ -6,14 +6,12 @@ type EmitterEvent = {
   data: unknown;
 };
 
-// Интерфейс IEvents с ослабленными generic-ограничениями
 export interface IEvents {
   on<T = unknown>(event: EventName, callback: (data: T) => void): void;
   emit<T = unknown>(event: string, data?: T): void;
   trigger<T = unknown>(event: string, context?: Partial<T>): (data: T) => void;
 }
 
-// Класс EventEmitter
 export class EventEmitter implements IEvents {
   private _events: Map<EventName, Set<Subscriber>> = new Map();
 

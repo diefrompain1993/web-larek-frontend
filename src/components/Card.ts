@@ -1,128 +1,119 @@
 import { Component } from './base/Component';
 import { ensureElement } from '../utils/utils';
-import { IProduct } from '../types/index';
+import { Product } from '../types/index';
 import { categories } from '../utils/constants';
 
-interface ICardProps {
-	id: string;
-	title: string;
-	price: number | null;
-	category?: string;
-	image?: string;
-	description?: string;
-	buttonText?: string;
-	inCart?: boolean;
-}
+type CardProps = {
+  id: string;
+  title: string;
+  price: number | null;
+  category?: string;
+  image?: string;
+  description?: string;
+  buttonText?: string;
+  inCart?: boolean;
+};
 
-interface CardEvents {
-	onClick?: () => void;
-}
+type CardActions = {
+  onClick?: () => void;
+};
 
-export class Card extends Component<ICardProps> {
-	private titleNode: HTMLElement;
-	private priceNode: HTMLElement;
-	private imageNode?: HTMLImageElement;
-	private categoryNode?: HTMLElement;
-	private descriptionNode?: HTMLElement;
-	private actionButton?: HTMLButtonElement;
+export class Card extends Component<CardProps> {
+  private elements = {
+    title: ensureElement<HTMLElement>('.card__title', this.container),
+    price: ensureElement<HTMLElement>('.card__price', this.container),
+    image: this.container.querySelector<HTMLImageElement>('.card__image'),
+    category: this.container.querySelector<HTMLElement>('.card__category'),
+    description: this.container.querySelector<HTMLElement>('.card__text'),
+    button: this.container.querySelector<HTMLButtonElement>('.card__button'),
+  };
 
-	private product!: IProduct;
-	private handlers: CardEvents;
+  private productData!: Product;
+  private actions: CardActions;
 
-	constructor(container: HTMLElement, handlers: CardEvents = {}) {
-		super(container);
-		this.handlers = handlers;
+  constructor(container: HTMLElement, actions: CardActions = {}) {
+    super(container);
+    this.actions = actions;
+    this.setupEventHandlers();
+  }
 
-		this.titleNode = ensureElement<HTMLElement>('.card__title', container);
-		this.priceNode = ensureElement<HTMLElement>('.card__price', container);
-		this.imageNode = container.querySelector('.card__image');
-		this.categoryNode = container.querySelector('.card__category');
-		this.descriptionNode = container.querySelector('.card__text');
-		this.actionButton = container.querySelector('.card__button');
+  private setupEventHandlers(): void {
+    const handleClick = (e: Event) => {
+      e.stopPropagation();
+      this.actions.onClick?.();
+    };
 
-		this.bindEvents();
-	}
+    if (this.elements.button) {
+      this.elements.button.addEventListener('click', handleClick);
+    } else {
+      this.container.addEventListener('click', handleClick);
+    }
+  }
 
-	private bindEvents() {
-		const handleClick = (e: Event) => {
-			e.stopPropagation();
-			this.handlers.onClick?.();
-		};
+  private updateCategory(category?: string): void {
+    if (!this.elements.category || !category) return;
 
-		if (this.actionButton) {
-			this.actionButton.addEventListener('click', handleClick);
-		} else {
-			this.container.addEventListener('click', () => this.handlers.onClick?.());
-		}
-	}
+    this.setText(this.elements.category, category);
+    categories.forEach(cls => this.elements.category!.classList.remove(cls));
+    const mappedClass = categories.get(category);
+    if (mappedClass) this.elements.category.classList.add(mappedClass);
+  }
 
-	private renderTitle(title: string) {
-		this.setText(this.titleNode, title);
-	}
+  private updatePrice(price: number | null): void {
+    const text = price === null ? 'Бесценно' : `${price} синапсов`;
+    this.setText(this.elements.price, text);
+  }
 
-	private renderCategory(category?: string) {
-		if (this.categoryNode && category) {
-			this.setText(this.categoryNode, category);
-			categories.forEach((cls) => this.categoryNode!.classList.remove(cls));
-			const cls = categories.get(category);
-			if (cls) this.categoryNode.classList.add(cls);
-		}
-	}
+  private updateImage(url?: string, alt?: string): void {
+    if (this.elements.image && url) {
+      this.setImage(this.elements.image, url, alt);
+    }
+  }
 
-	private renderImage(src?: string, alt?: string) {
-		if (this.imageNode && src) {
-			this.setImage(this.imageNode, src, alt);
-		}
-	}
+  private updateDescription(desc?: string): void {
+    if (this.elements.description && desc) {
+      this.setText(this.elements.description, desc);
+    }
+  }
 
-	private renderPrice(price: number | null) {
-		this.setText(this.priceNode, price === null ? 'Бесценно' : `${price} синапсов`);
-	}
+  private updateButton(price: number | null, inCart?: boolean): void {
+    if (!this.elements.button) return;
 
-	private renderDescription(text?: string) {
-		if (this.descriptionNode && text) {
-			this.setText(this.descriptionNode, text);
-		}
-	}
+    if (price === null) {
+      this.setText(this.elements.button, 'Нельзя купить');
+      this.setDisabled(this.elements.button, true);
+    } else {
+      const label = inCart ? 'Удалить из корзины' : 'В корзину';
+      this.setText(this.elements.button, label);
+      this.setDisabled(this.elements.button, false);
+    }
+  }
 
-	private renderActionButton(price: number | null, inCart?: boolean) {
-		if (!this.actionButton) return;
+  override render(props: CardProps): HTMLElement {
+    this.productData = {
+      id: props.id,
+      title: props.title,
+      price: props.price,
+      image: props.image,
+      description: props.description,
+      category: props.category,
+    };
 
-		if (price === null) {
-			this.setText(this.actionButton, 'Нельзя купить');
-			this.setDisabled(this.actionButton, true);
-		} else {
-			const label = inCart ? 'Удалить из корзины' : 'В корзину';
-			this.setText(this.actionButton, label);
-			this.setDisabled(this.actionButton, false);
-		}
-	}
+    this.setText(this.elements.title, props.title);
+    this.updateCategory(props.category);
+    this.updateImage(props.image, props.title);
+    this.updatePrice(props.price);
+    this.updateDescription(props.description);
+    this.updateButton(props.price, props.inCart);
 
-	override render(data: ICardProps): HTMLElement {
-		this.product = {
-			id: data.id,
-			title: data.title,
-			price: data.price,
-			image: data.image,
-			description: data.description,
-			category: data.category,
-		};
+    return this.container;
+  }
 
-		this.renderTitle(data.title);
-		this.renderCategory(data.category);
-		this.renderImage(data.image, data.title);
-		this.renderPrice(data.price);
-		this.renderDescription(data.description);
-		this.renderActionButton(data.price, data.inCart);
+  public get id(): string {
+    return this.productData.id;
+  }
 
-		return this.container;
-	}
-
-	public get id(): string {
-		return this.product.id;
-	}
-
-	public get data(): IProduct {
-		return this.product;
-	}
+  public get data(): Product {
+    return this.productData;
+  }
 }

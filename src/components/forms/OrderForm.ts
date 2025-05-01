@@ -1,16 +1,16 @@
 import { Component } from '../base/Component';
 import { ensureElement } from '../../utils/utils';
 import { IEvents } from '../../services/events';
-import { PaymentType, TPaymentFields } from '../../types/index';
+import { PaymentMethod, DeliveryInfo } from '../../types/index';
 
-export class OrderForm extends Component<TPaymentFields & { valid: boolean; errors: string }> {
+export class OrderForm extends Component<DeliveryInfo & { valid: boolean; errors: string }> {
   private addressInput: HTMLInputElement;
   private cardButton: HTMLButtonElement;
   private cashButton: HTMLButtonElement;
   private submitButton: HTMLButtonElement;
   private errorOutput: HTMLElement;
   private events: IEvents;
-  private selectedPayment: PaymentType | null = null;
+  private selectedPayment: PaymentMethod | null = null;
 
   constructor(container: HTMLFormElement, events: IEvents) {
     super(container);
@@ -55,7 +55,7 @@ export class OrderForm extends Component<TPaymentFields & { valid: boolean; erro
     });
   }
 
-  private selectPayment(method: PaymentType): void {
+  private selectPayment(method: PaymentMethod): void {
     this.selectedPayment = method;
     this.events.emit('order:change', {
       field: 'payment',
@@ -64,12 +64,12 @@ export class OrderForm extends Component<TPaymentFields & { valid: boolean; erro
     this.toggleSelectedButton(method);
   }
 
-  private toggleSelectedButton(method: PaymentType) {
+  private toggleSelectedButton(method: PaymentMethod) {
     this.cardButton.classList.toggle('button_alt-active', method === 'card');
     this.cashButton.classList.toggle('button_alt-active', method === 'cash');
   }
 
-  override render(data: TPaymentFields & { valid: boolean; errors: string }): HTMLElement {
+  override render(data: DeliveryInfo & { valid: boolean; errors: string }): HTMLElement {
     this.addressInput.value = data.address || '';
     this.submitButton.disabled = !data.valid;
     this.errorOutput.textContent = data.errors || '';

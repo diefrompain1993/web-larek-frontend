@@ -1,42 +1,39 @@
-import { IProduct } from '../types/index';
-import { IEvents } from '../types/index';
+import { Product } from '../types/index';
+import { EventBus } from '../types/index';
 
 export class CartModel {
-  private items: IProduct[] = [];
-  private events: IEvents;
+  private cartItems: Product[] = [];
 
-  constructor(events: IEvents) {
-    this.events = events;
+  constructor(private eventBus: EventBus) {}
+
+  add(product: Product): void {
+    this.cartItems.push(product);
+    this.notifyChanges();
   }
 
-  addItem(product: IProduct): void {
-    this.items.push(product);
-    this.emitChange();
-  }
-
-  removeItem(productId: string): void {
-    const index = this.items.findIndex((item) => item.id === productId);
+  remove(productId: string): void {
+    const index = this.cartItems.findIndex((item) => item.id === productId);
     if (index !== -1) {
-      this.items.splice(index, 1);
-      this.emitChange();
+      this.cartItems.splice(index, 1);
+      this.notifyChanges();
     }
   }
 
-  getItems(): IProduct[] {
-    return this.items;
+  clear(): void {
+    this.cartItems = [];
+    this.notifyChanges();
   }
 
-  clear(): void {
-    this.items = [];
-    this.emitChange();
+  getItems(): Product[] {
+    return [...this.cartItems];
   }
 
   getTotal(): number {
-    return this.items.reduce((sum, item) => sum + (item.price ?? 0), 0);
+    return this.cartItems.reduce((acc, item) => acc + (item.price ?? 0), 0);
   }
 
-  private emitChange(): void {
-    this.events.emit('cart:change', this.items);
-    this.events.emit('cart:count', this.items.length);
+  private notifyChanges(): void {
+    this.eventBus.emit('cart:change', this.cartItems);
+    this.eventBus.emit('cart:count', this.cartItems.length);
   }
 }

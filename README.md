@@ -40,12 +40,32 @@ npm run build
 ```
 yarn build
 ```
-##  Данные и типы данных, используемые в приложении
 
-### Товар
+## Архитектура
+
+Проект построен по принципу **MVP**:
+
+-   **Model** 
+    — хранит и валидирует состояние корзины и заказа (`CartModel`, `OrderModel`).
+    
+-   **View**
+    — отдельные UI-компоненты, отвечающие за отображение и обработку взаимодействия с DOM.
+    
+-   **Presenter / EventBus**
+    — `EventEmitter` связывает Model и View через публикацию/подписку на события.
+    
+
+----------
+
+##  Типы данных
+
+Все типы объединены в `src/types/index.ts`.
+
+
+#### Описание товара
 
 ```ts
-export interface IProduct {
+export interface Product {
   id: string;
   title: string;
   description?: string;
@@ -54,228 +74,258 @@ export interface IProduct {
   price: number | null; // null = бесценный товар
 }
 
-export type TSummaryProduct = Pick<IProduct, 'id' | 'title' | 'price'>;
+```
+
+----------
+
+#### Элемент корзины
+
+```ts
+export type CartItem = Pick<Product, 'id' | 'title' | 'price'>;
 
 ```
 
-### Заказ
+----------
+
+#### Параметры заказа
 
 ```ts
-export interface IOrder {
+export interface OrderPayload {
   total: number;
   items: string[];
   email: string;
   phone: string;
   address: string;
-  payment: PaymentType;
+  payment: PaymentMethod;
 }
 
 ```
 
-### Типы, связанные с заказом
+----------
+
+#### Способы оплаты
 
 ```ts
-export type PaymentType = 'card' | 'cash';
-export type TFormErrors = Partial<Record<keyof IOrder, string>>;
-export type TOrderFields = Pick<IOrder, 'payment' | 'address' | 'email' | 'phone'>;
-export type TPaymentFields = Pick<IOrder, 'payment' | 'address'>;
-export type TUserContactFields = Pick<IOrder, 'email' | 'phone'>;
+export type PaymentMethod = 'card' | 'cash';
 
 ```
 
 ----------
 
-##  Архитектура приложения
+#### Ошибки валидации формы
 
-Приложение реализовано по принципу **MVP (Model-View-Presenter)**:
+```ts
+export type FormErrors = Partial<Record<keyof OrderPayload, string>>;
 
--   **Model**: `CartModel`, `OrderModel` — управляют состоянием данных
-    
--   **View**: компоненты интерфейса (`Card`, `Basket`, `Modal`, `OrderForm`, `ContactForm`, `Success`)
-    
--   **Presenter**: `EventEmitter` — осуществляет маршрутизацию событий между моделью и представлением
-    
+```
 
 ----------
 
-##  Слой данных (Models)
+#### Поля оформления заказа (шаги)
 
-### `CartModel`
+```ts
+// Для выбора способа оплаты и адреса
+export type DeliveryInfo = Pick<OrderPayload, 'payment' | 'address'>;
 
-Управляет корзиной:
+// Для контактных данных
+export type ContactInfo = Pick<OrderPayload, 'email' | 'phone'>;
 
--   `addItem(product: IProduct)` — добавить товар
-    
--   `removeItem(id: string)` — удалить товар
-    
--   `getItems()` — получить товары
-    
--   `getTotal()` — общая стоимость
-    
--   `clear()` — очистка корзины
-    
--   Генерирует события: `cart:change`, `cart:count`
-    
+// Все одновременно (если нужно)
+export type OrderFormFields = Pick<OrderPayload, 'payment' | 'address' | 'email' | 'phone'>;
 
-### `OrderModel`
+```
+----------
 
-Хранит и валидирует заказ:
+## Слой данных (Models)
 
--   `setField(field, value)` — обновить поле
+### CartModel
+
+Управляет списком товаров в корзине.
+
+-   **Методы**
     
--   `validate(step)` — валидация по шагу ('order' или 'contacts')
+    -   `add(product: Product): void`
+        
+    -   `remove(productId: string): void`
+        
+    -   `clear(): void`
+        
+    -   `getItems(): Product[]`
+        
+    -   `getTotal(): number`
+        
+-   **События**
     
--   `getOrder()` — вернуть текущий заказ
+    -   `cart:change` — передаёт новый массив товаров
+        
+    -   `cart:count` — передаёт текущее число товаров
+        
+
+----------
+
+### OrderModel
+
+Хранит текущее состояние заказа и выполняет валидацию.
+
+-   **Методы**
     
--   `getErrors()` — ошибки валидации
+    -   `assignItems(itemIds: string[], totalSum: number): void`
+        
+    -   `updateField(field: keyof OrderFormFields, value: string): void`
+        
+    -   `validate(section: 'delivery' | 'contacts'): boolean`
+        
+    -   `reset(): void`
+        
+-   **События**
     
--   `reset()` — сброс заказа
-    
--   Генерирует события: `formErrors:change`
-    
+    -   `form:errors` — передаёт объект `FormErrors` после каждой валидации
+        
 
 ----------
 
 ##  Слой отображения (View Components)
 
-### `Component`
+### Базовый класс `Component<T>`
 
-Абстрактный базовый класс. Предоставляет вспомогательные методы:
+Абстрактный компонент:
 
--   `setText`, `toggleClass`, `setDisabled`, `setImage`, `render`
+-   Конструктор принимает `container: HTMLElement`
     
-
-### `Card`
-
-Карточка товара. Отображает название, цену, категорию, описание и кнопку «Купить» или «Удалить».
-
-### `Basket`
-
-Корзина. Отображает добавленные товары, их стоимость и кнопку «Оформить заказ».
-
-### `Modal`
-
-Модальное окно. Показывает любое содержимое, закрывается по ESC, клику вне, или кнопке.
-
-### `OrderForm`
-
-Форма адреса и способа оплаты:
-
--   Валидация адреса
+-   `render(data?: Partial<T>): HTMLElement` — обновляет внутренние поля и возвращает контейнер
     
--   Выбор способа оплаты (картой или наличными)
+-   Утилиты:
     
-
-### `ContactForm`
-
-Форма email и телефона:
-
--   Форматированный ввод номера
-    
--   Валидация email
-    
--   Проверка корректности и заполненности
-    
-
-### `Success`
-
-Сообщение об успешной оплате. Показывает сумму и кнопку закрытия.
+    -   `setText`, `toggleClass`, `setDisabled`, `setImage`
+        
 
 ----------
 
-##  EventEmitter (Presenter Layer)
+### Card
 
-Механизм связи между слоями:
+Отображает карточку товара.
 
-```ts
-interface IEvents {
-  on<T = unknown>(event: string, callback: (data: T) => void): void;
-  emit<T = unknown>(event: string, data?: T): void;
-}
 
-```
+`new  Card(container: HTMLElement, actions?: { onClick?: () =>  void })` 
 
-### Примеры событий:
-
--   `product:view` — открытие карточки товара
+-   **render(props: CardProps): HTMLElement**
     
--   `basket:checkout` — открыть оформление
+    -   `id`, `title`, `price`, `category?`, `image?`, `description?`, `inCart?`
+        
+-   Автоматически меняет текст и состояние кнопки (`«В корзину»` / `«Удалить»`)
     
--   `order:submit` — переход к шагу контактов
-    
--   `contacts:submit` — отправка заказа
-    
--   `cart:change` — обновить корзину
-    
--   `formErrors:change` — синхронизировать ошибки формы
+-   Генерирует `actions.onClick`
     
 
 ----------
 
-##  Работа с API
+### Basket
 
-```ts
-export interface IApi {
-  baseUrl: string;
-  get<T>(uri: string): Promise<T>;
-  post<T>(uri: string, data: object, method?: 'POST' | 'PUT' | 'DELETE'): Promise<T>;
-}
+Отображает содержимое корзины.
 
-```
-
-### Методы:
-
--   `getProducts()` — получить список товаров
+-   **update(items: CartItem[]): HTMLElement**  
+    — перерисовывает список, рассчитывает `total`, включает/отключает кнопку «Оформить»
     
--   `sendOrder(order: IOrder)` — оформить заказ
+-   По клику на «Оформить».Emit’ит событие `basket:checkout`
     
 
 ----------
 
-##  Прочие интерфейсы
+### Modal 
 
-```ts
-export interface ICardActions {
-  onClick: (event: MouseEvent) => void;
-}
+Обёртка для любого контента в модальном окне.
 
-export interface ISuccessActions {
-  onClick: () => void;
-}
-
-```
-
-----------
-
-##  Типы валидации
-
-```ts
-export interface IFormValidator {
-  valid: boolean;
-  errors: string[];
-}
-
-```
-
-Используется формами для отображения состояния и сообщений.
-
-----------
-
-##  Сценарий работы приложения
-
-1.  Пользователь видит каталог (`Card`)
+-   **open(content: HTMLElement): void**
     
-2.  При клике — `product:view`, открывается `Modal`
+-   **close(): void**
     
-3.  Кнопка «Купить» — `cart:change`, обновляется `Basket`
+-   `render(data: { content: HTMLElement }): HTMLElement` — открывает окно
     
-4.  Клик «Оформить» — `basket:checkout`, открывается `OrderForm`
-    
-5.  После валидации — `order:submit`, открывается `ContactForm`
-    
-6.  Если форма заполнена — `contacts:submit`, отправка заказа
-    
-7.  Сервер отвечает — показывается `Success`
+-   Закрывается по ESC, клику вне содержимого и по кнопке «Закрыть»
     
 
 ----------
+
+### OrderForm
+
+Форма выбора способа оплаты и ввода адреса.
+
+-   Принимает `container: HTMLFormElement` и `events: IEvents`
+    
+-   Валидация адреса (минимум 5 символов)
+    
+-   Кнопки выбора `card` / `cash`
+    
+-   `render(data: DeliveryInfo & { valid: boolean; errors: string }): HTMLElement`
+    
+
+----------
+
+### ContactForm 
+
+Форма ввода email и телефона.
+
+-   Форматирует телефон в российский формат `+7 (XXX) XXX-XX-XX`
+    
+-   Валидация email и длины номера
+    
+-   `render(data: ContactInfo & { valid: boolean; errors: string[] }): HTMLElement`
+    
+-   При успешной валидации Emit’ит `contacts:submit`
+    
+
+----------
+
+### Success 
+
+Сообщение об успешном оформлении заказа.
+
+-   **render(data: { total: number }): HTMLElement** — выводит сумму
+    
+-   При клике на закрытие вызывает колбэк из `options.onClose`
+    
+
+----------
+
+## Presenter — EventEmitter 
+
+`interface  IEvents {
+  on<T>(event: string | RegExp, cb: (data: T) => void): void;
+  emit<T>(event: string, data?: T): void;
+  trigger<T>(event: string, ctx?: Partial<T>): (data: T) => void;
+}` 
+
+Используется для связи между компонентами и моделями без жёстких зависимостей.
+
+----------
+
+##  Работа с API 
+
+Класс `ApiService`:
+
+-   **fetchProducts(): Promise<{ total: number; items: Product[] }>**
+    
+-   **submitOrder(order: OrderPayload): Promise<{ total: number }>**
+    
+
+Оборачивает `fetch`, добавляет заголовки, обрабатывает ошибки и парсит JSON.
+
+----------
+
+## Взаимодействие компонентов
+
+1.  Инициализируем `ApiService`, `EventEmitter`, модели (`CartModel`, `OrderModel`) и View-компоненты.
+    
+2.  Загружаем товары с сервера и рендерим `Card` в галерее.
+    
+3.  По событиям:
+    
+    -   `product:view` → открытие превью в `Modal`
+        
+    -   `basket:checkout` → открытие `OrderForm`
+        
+    -   `order:submit` → открытие `ContactForm`
+        
+    -   `contacts:submit` → вызов `ApiService.submitOrder` → очистка корзины → открытие `Success`
+        
+4.  Изменения корзины и форм синхронизируются через `EventEmitter` и методы `render` компонентов.

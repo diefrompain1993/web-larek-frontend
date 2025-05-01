@@ -1,9 +1,9 @@
 import { Component } from '../base/Component';
 import { ensureElement } from '../../utils/utils';
 import { IEvents } from '../../services/events';
-import { TUserContactFields } from '../../types';
+import { ContactInfo } from '../../types';
 
-export class ContactForm extends Component<TUserContactFields & { valid: boolean; errors: string[] }> {
+export class ContactForm extends Component<ContactInfo & { valid: boolean; errors: string[] }> {
   private emailInput: HTMLInputElement;
   private phoneInput: HTMLInputElement;
   private submitButton: HTMLButtonElement;
@@ -107,7 +107,7 @@ export class ContactForm extends Component<TUserContactFields & { valid: boolean
     return emailRegex.test(value);
   }
 
-  override render(data: TUserContactFields & { valid: boolean; errors: string[] }): HTMLElement {
+  override render(data: ContactInfo & { valid: boolean; errors: string[] }): HTMLElement {
     this.emailInput.value = data.email || '';
     this.phoneInput.value = data.phone || '';
     this.submitButton.disabled = !data.valid;
