@@ -41,56 +41,85 @@ npm run build
 yarn build
 ```
 
-## Архитектура
+## Архитектура (MVP + EventEmitter)
 
-Проект построен по принципу **MVP**:
+Проект использует паттерн **Model–View–Presenter** с событийной шиной для слабой связности.
 
--   **Model** 
-    — хранит и валидирует состояние корзины и заказа (`CartModel`, `OrderModel`).
+-   **Model**: хранит состояние и выполняет валидацию.
     
--   **View**
-    — отдельные UI-компоненты, отвечающие за отображение и обработку взаимодействия с DOM.
+    -   `CartModel`: управление элементами корзины, подсчёт итога.
+        
+    -   `OrderModel`: хранение полей заказа и детализированная валидация:
+        
+        -   **Delivery** (payment и address, минимум 5 символов для адреса)
+            
+        -   **Contacts** (email через RegExp, телефон 11 цифр)
+            
+-   **View**: компоненты, отвечающие только за отображение и генерацию событий.
     
--   **Presenter / EventBus**
-    — `EventEmitter` связывает Model и View через публикацию/подписку на события.
+    -   **Component<T>** — базовый класс без бизнес-логики.
+        
+    -   **CatalogView** — рендер списка карточек.
+        
+    -   **HeaderView** — кнопка корзины и счётчик.
+        
+    -   **BasketView** — список товаров, итоговая сумма, кнопка «Оформить».
+        
+    -   **ProductPreviewView** — предпросмотр товара в модалке.
+        
+    -   **OrderForm** — форма доставки (отображение valid/errors, выбор способа, адрес).
+        
+    -   **ContactForm** — форма контактов с UX-маской телефона и подсветкой ошибок.
+        
+    -   **SuccessView** — модалка успеха с выводом суммы и кнопкой закрыть.
+        
+-   **Presenter**
     
+    1.  Инициализирует View и Model.
+        
+    2.  Слушает события (`order:change`, `basket:checkout` и т.д.).
+        
+    3.  Вызывает методы модели (`updateField`, `validate`, `assignItems`).
+        
+    4.  Обновляет View вызовом `view.render` или `setItems`, `setTotal`, `setCount`.
+        
+    5.  Делает HTTP-запросы через `ApiService`.
+        
 
 ----------
 
-##  Типы данных
+## Основные типы данных
 
-Все типы объединены в `src/types/index.ts`.
+Все типы в `src/types/index.ts`.
 
-
-#### Описание товара
+-   **Product**:
+    
 
 ```ts
-export interface Product {
+interface Product {
   id: string;
   title: string;
   description?: string;
   image?: string;
   category?: string;
-  price: number | null; // null = бесценный товар
+  price: number | null;
 }
 
 ```
 
-----------
-
-#### Элемент корзины
+-   **CartItem**:
+    
 
 ```ts
-export type CartItem = Pick<Product, 'id' | 'title' | 'price'>;
+type CartItem = Pick<Product, 'id' | 'title' | 'price'>;
 
 ```
 
-----------
-
-#### Параметры заказа
+-   **OrderPayload**:
+    
 
 ```ts
-export interface OrderPayload {
+interface OrderPayload {
   total: number;
   items: string[];
   email: string;
@@ -101,231 +130,121 @@ export interface OrderPayload {
 
 ```
 
-----------
-
-#### Способы оплаты
-
-```ts
-export type PaymentMethod = 'card' | 'cash';
-
-```
+-   **PaymentMethod**: `'card' | 'cash'`.
+    
+-   **FormErrors**: `{ delivery?; contacts?; email?; phone?; ... }`.
+    
+-   **OrderFormFields**, **DeliveryInfo**, **ContactInfo** — вспомогательные типы.
+    
 
 ----------
 
-#### Ошибки валидации формы
-
-```ts
-export type FormErrors = Partial<Record<keyof OrderPayload, string>>;
-
-```
-
-----------
-
-#### Поля оформления заказа (шаги)
-
-```ts
-// Для выбора способа оплаты и адреса
-export type DeliveryInfo = Pick<OrderPayload, 'payment' | 'address'>;
-
-// Для контактных данных
-export type ContactInfo = Pick<OrderPayload, 'email' | 'phone'>;
-
-// Все одновременно (если нужно)
-export type OrderFormFields = Pick<OrderPayload, 'payment' | 'address' | 'email' | 'phone'>;
-
-```
-----------
-
-## Слой данных (Models)
+## Models
 
 ### CartModel
 
-Управляет списком товаров в корзине.
-
--   **Методы**
+-   `add(product)`, `remove(id)`, `clear()`
     
-    -   `add(product: Product): void`
-        
-    -   `remove(productId: string): void`
-        
-    -   `clear(): void`
-        
-    -   `getItems(): Product[]`
-        
-    -   `getTotal(): number`
-        
--   **События**
+-   `getItems()`, `getTotal()`
     
-    -   `cart:change` — передаёт новый массив товаров
-        
-    -   `cart:count` — передаёт текущее число товаров
-        
-
-----------
+-   Эмитит `cart:change` и `cart:count` при изменениях
+    
 
 ### OrderModel
 
-Хранит текущее состояние заказа и выполняет валидацию.
-
--   **Методы**
+-   `assignItems(ids, sum)`, `updateField(field, value)`, `validate(section)`, `reset()`
     
-    -   `assignItems(itemIds: string[], totalSum: number): void`
-        
-    -   `updateField(field: keyof OrderFormFields, value: string): void`
-        
-    -   `validate(section: 'delivery' | 'contacts'): boolean`
-        
-    -   `reset(): void`
-        
--   **События**
+-   **Валидация**:
     
-    -   `form:errors` — передаёт объект `FormErrors` после каждой валидации
+    -   Адрес: минимум 5 символов
         
+    -   Способ оплаты: обязательный выбор
+        
+    -   Email: RegExp `/^[^\s@]+@[^\s@]+\.[^\s@]+$/`
+        
+    -   Телефон: ровно 11 цифр, формат +7...
+        
+-   Эмитит `form:errors` после валидации
+    
 
 ----------
 
-##  Слой отображения (View Components)
+## View-компоненты (public API)
 
-### Базовый класс `Component<T>`
-
-Абстрактный компонент:
-
--   Конструктор принимает `container: HTMLElement`
+-   **Component**:
     
--   `render(data?: Partial<T>): HTMLElement` — обновляет внутренние поля и возвращает контейнер
-    
--   Утилиты:
-    
+    -   `render(data: Partial<T>)`
+        
     -   `setText`, `toggleClass`, `setDisabled`, `setImage`
         
-
-----------
-
-### Card
-
-Отображает карточку товара.
-
-
-`new  Card(container: HTMLElement, actions?: { onClick?: () =>  void })` 
-
--   **render(props: CardProps): HTMLElement**
+-   **CatalogView**:
     
-    -   `id`, `title`, `price`, `category?`, `image?`, `description?`, `inCart?`
+    -   `setItems(nodes: HTMLElement[])`
         
--   Автоматически меняет текст и состояние кнопки (`«В корзину»` / `«Удалить»`)
+-   **HeaderView**:
     
--   Генерирует `actions.onClick`
-    
-
-----------
-
-### Basket
-
-Отображает содержимое корзины.
-
--   **update(items: CartItem[]): HTMLElement**  
-    — перерисовывает список, рассчитывает `total`, включает/отключает кнопку «Оформить»
-    
--   По клику на «Оформить».Emit’ит событие `basket:checkout`
-    
-
-----------
-
-### Modal 
-
-Обёртка для любого контента в модальном окне.
-
--   **open(content: HTMLElement): void**
-    
--   **close(): void**
-    
--   `render(data: { content: HTMLElement }): HTMLElement` — открывает окно
-    
--   Закрывается по ESC, клику вне содержимого и по кнопке «Закрыть»
-    
-
-----------
-
-### OrderForm
-
-Форма выбора способа оплаты и ввода адреса.
-
--   Принимает `container: HTMLFormElement` и `events: IEvents`
-    
--   Валидация адреса (минимум 5 символов)
-    
--   Кнопки выбора `card` / `cash`
-    
--   `render(data: DeliveryInfo & { valid: boolean; errors: string }): HTMLElement`
-    
-
-----------
-
-### ContactForm 
-
-Форма ввода email и телефона.
-
--   Форматирует телефон в российский формат `+7 (XXX) XXX-XX-XX`
-    
--   Валидация email и длины номера
-    
--   `render(data: ContactInfo & { valid: boolean; errors: string[] }): HTMLElement`
-    
--   При успешной валидации Emit’ит `contacts:submit`
-    
-
-----------
-
-### Success 
-
-Сообщение об успешном оформлении заказа.
-
--   **render(data: { total: number }): HTMLElement** — выводит сумму
-    
--   При клике на закрытие вызывает колбэк из `options.onClose`
-    
-
-----------
-
-## Presenter — EventEmitter 
-
-`interface  IEvents {
-  on<T>(event: string | RegExp, cb: (data: T) => void): void;
-  emit<T>(event: string, data?: T): void;
-  trigger<T>(event: string, ctx?: Partial<T>): (data: T) => void;
-}` 
-
-Используется для связи между компонентами и моделями без жёстких зависимостей.
-
-----------
-
-##  Работа с API 
-
-Класс `ApiService`:
-
--   **fetchProducts(): Promise<{ total: number; items: Product[] }>**
-    
--   **submitOrder(order: OrderPayload): Promise<{ total: number }>**
-    
-
-Оборачивает `fetch`, добавляет заголовки, обрабатывает ошибки и парсит JSON.
-
-----------
-
-## Взаимодействие компонентов
-
-1.  Инициализируем `ApiService`, `EventEmitter`, модели (`CartModel`, `OrderModel`) и View-компоненты.
-    
-2.  Загружаем товары с сервера и рендерим `Card` в галерее.
-    
-3.  По событиям:
-    
-    -   `product:view` → открытие превью в `Modal`
+    -   `setCount(n: number)`
         
-    -   `basket:checkout` → открытие `OrderForm`
+    -   Эмитит `header:openBasket` по клику на иконку корзины
         
-    -   `order:submit` → открытие `ContactForm`
+-   **BasketView**:
+    
+    -   `render()` → HTMLElement контейнер
         
-    -   `contacts:submit` → вызов `ApiService.submitOrder` → очистка корзины → открытие `Success`
+    -   `setItems(nodes: HTMLElement[])`
         
-4.  Изменения корзины и форм синхронизируются через `EventEmitter` и методы `render` компонентов.
+    -   `setTotal(amount: number)`
+        
+    -   `setCheckoutEnabled(flag: boolean)`
+        
+    -   Эмитит `basket:checkout` по клику
+        
+-   **ProductPreviewView**:
+    
+    -   `render(props: { Product & { inCart: boolean } })`
+        
+    -   Эмитит `preview:toggleCart` с `{ id }`
+        
+-   **OrderForm**:
+    
+    -   `render(props: { payment, address, valid, errors })`
+        
+    -   Эмитит `order:change` и `order:submit`
+        
+-   **ContactForm**:
+    
+    -   `render(props: { email, phone, valid, errors: { email?, phone? } })`
+        
+    -   Форматирует телефон как +7 (XXX) XXX-XX-XX
+        
+    -   Подсвечивает инпуты при ошибках
+        
+    -   Эмитит `order:change` и `contacts:submit`
+        
+-   **SuccessView**:
+    
+    -   `render({ total })`
+        
+    -   Эмитит `success:close`
+        
+
+----------
+
+## Presenter
+
+Сценарии:
+
+1.  `fetchProducts` → `CatalogView.setItems`
+    
+2.  `product:view` → `ProductPreviewView.render` → `preview:toggleCart` → model.update
+    
+3.  `cart:change` → `BasketView` + `HeaderView.setCount`
+    
+4.  `basket:checkout` → `OrderForm.render`
+    
+5.  `order:submit` → `ContactForm.render`
+    
+6.  `contacts:submit` → `ApiService.submitOrder` → `SuccessView.render` → `success:close`
+    
+
+----------

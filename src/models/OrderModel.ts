@@ -22,42 +22,40 @@ export class OrderModel {
 
   constructor(private events: EventEmitter) {}
 
-  assignItems(itemIds: string[], totalSum: number): void {
+  public assignItems(itemIds: string[], totalSum: number): void {
     this.data.items = itemIds;
     this.data.total = totalSum;
   }
 
-  updateField(field: keyof OrderFormFields, value: string): void {
+  public updateField(field: keyof OrderFormFields, value: string): void {
     (this.data as any)[field] = value;
-
     const section = field === 'email' || field === 'phone' ? 'contacts' : 'delivery';
     this.validate(section);
   }
 
-  get current(): OrderPayload {
+  public get current(): OrderPayload {
     return this.data;
   }
 
-  get errors(): FormErrors {
+  public get errors(): FormErrors {
     return this.validationErrors;
   }
 
-  validate(section: 'delivery' | 'contacts'): boolean {
+  public validate(section: 'delivery' | 'contacts'): boolean {
     const updatedErrors: FormErrors = { ...this.validationErrors };
 
     if (section === 'delivery') {
-      const delivery: DeliveryInfo = {
-        payment: this.data.payment,
-        address: this.data.address,
-      };
+      const { address, payment } = this.data;
 
-      if (!delivery.address?.trim()) {
-        updatedErrors.address = 'Введите адрес доставки';
+      if (!address?.trim()) {
+        updatedErrors.address = 'Укажите адрес доставки';
+      } else if (address.trim().length < 5) {
+        updatedErrors.address = 'Введите корректный адрес';
       } else {
         delete updatedErrors.address;
       }
 
-      if (!delivery.payment) {
+      if (!payment) {
         updatedErrors.payment = 'Выберите способ оплаты';
       } else {
         delete updatedErrors.payment;
@@ -65,18 +63,20 @@ export class OrderModel {
     }
 
     if (section === 'contacts') {
-      const contact: ContactInfo = {
-        email: this.data.email,
-        phone: this.data.phone,
-      };
+      const { email, phone } = this.data;
 
-      if (!contact.email?.trim()) {
+      if (!email?.trim()) {
         updatedErrors.email = 'Укажите email';
+      } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        updatedErrors.email = 'Некорректный email';
       } else {
         delete updatedErrors.email;
       }
 
-      if (!contact.phone?.trim() || contact.phone.replace(/\D/g, '').length < 11) {
+      const digits = phone.replace(/\D/g, '');
+      if (!digits) {
+        updatedErrors.phone = 'Укажите телефон';
+      } else if (digits.length !== 11) {
         updatedErrors.phone = 'Укажите корректный телефон';
       } else {
         delete updatedErrors.phone;
@@ -85,11 +85,10 @@ export class OrderModel {
 
     this.validationErrors = updatedErrors;
     this.events.emit('form:errors', updatedErrors);
-
     return Object.keys(updatedErrors).length === 0;
   }
 
-  reset(): void {
+  public reset(): void {
     this.data = {
       total: 0,
       items: [],
